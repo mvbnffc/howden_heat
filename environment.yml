@@ -1,4 +1,4 @@
-name: howden_heatwaves
+name: howden_heat
 channels:
   - conda-forge
   - defaults
