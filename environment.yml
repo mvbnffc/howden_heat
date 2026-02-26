@@ -1,0 +1,26 @@
+name: howden_heatwaves
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  # Core scientific
+  - numpy
+  - pandas
+  - scipy
+  # Climate / geospatial data
+  - xarray
+  - zarr
+  - rasterio
+  - geopandas
+  - cartopy
+  # Visualisation
+  - matplotlib
+  - seaborn
+  # Notebooks
+  - jupyter
+  - ipykernel
+  - ipywidgets
+  - pip
+  - pip:
+    - jupyterlab
