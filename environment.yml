@@ -1,0 +1,21 @@
+name: howden_heat
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - geopandas
+  - rasterio
+  - fiona
+  - shapely
+  - scipy
+  - matplotlib
+  - seaborn
+  - tqdm
+  - requests
+  - pyyaml
+  - jupyterlab
+  - ipykernel
+  - ipywidgets

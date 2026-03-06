@@ -1,0 +1,134 @@
+##########################
+### Analysis Countries ###
+##########################
+
+iso_codes:
+- "AGO"
+- "ALB"
+- "ARG"
+- "ARM"
+- "BDI"
+- "BEN"
+- "BFA"
+- "BGD"
+- "BGR"
+- "BIH"
+- "BLZ"
+- "BOL"
+- "BRA"
+- "BTN"
+- "BWA"
+- "CAF"
+- "CIV"
+- "CMR"
+- "COD"
+- "COG"
+- "COL"
+- "CRI"
+- "DJI"
+- "DOM"
+- "DZA"
+- "ECU"
+- "EGY"
+- "ERI"
+- "ETH"
+- "GEO"
+- "GHA"
+- "GIN"
+- "GMB"
+- "GNB"
+- "GTM"
+- "GUY"
+- "HND"
+- "HTI"
+- "IDN"
+- "IND"
+- "JAM"
+- "JOR"
+- "KAZ"
+- "KEN"
+- "KGZ"
+- "KHM"
+- "LAO"
+- "LBR"
+- "LKA"
+- "LSO"
+- "MAR"
+- "MDA"
+- "MDG"
+- "MEX"
+- "MKD"
+- "MLI"
+- "MNE"
+- "MOZ"
+- "MRT"
+- "MWI"
+- "MYS"
+- "NER"
+- "NGA"
+- "NIC"
+- "NPL"
+- "PAK"
+- "PER"
+- "PHL"
+- "PRY"
+- "ROU"
+- "RWA"
+- "SEN"
+- "SLE"
+- "SLV"
+- "SRB"
+- "SUR"
+- "SWZ"
+- "TCD"
+- "TGO"
+- "THA"
+- "TJK"
+- "TKM"
+- "TUN"
+- "TUR"
+- "TZA"
+- "UGA"
+- "UKR"
+- "UZB"
+- "VNM"
+- "ZAF"
+- "ZMB"
+- "ZWE"
+
+##########################
+###     Data Paths     ###
+##########################
+
+data:
+  wbgt_dir: "data/wbgt"           # directory containing downloaded daily WBGT GeoTIFFs
+  population: "data/population/global_pop_2025_CN_1km_R2025A_UA_v1.tif"
+  rwi: "data/rwi/rwi.tif"         # global RWI GeoTIFF
+  rwi_csv_dir: "data/rwi/csv"     # per-country RWI CSVs
+  processed_dir: "data/processed"
+  boundaries: "data/boundaries/ne_10m_admin_0_countries.shp"  # Natural Earth 1:10m
+
+##########################
+###   WBGT Download    ###
+##########################
+
+wbgt:
+  url_template: "https://data.chc.ucsb.edu/experimental/CHIRTS-ERA5/wbgt/tifs/daily/{year}/WBGT.{year}.{month:02d}.{day:02d}.tif"
+  # Adjust start/end year to define the full available period
+  start_year: 1983
+  end_year: 2016
+
+##########################
+###      Epochs        ###
+##########################
+
+epochs:
+  full_period:
+    start: 1983
+    end: 2016
+  early:
+    start: 1983
+    end: 1999
+  late:
+    start: 2000
+    end: 2016
