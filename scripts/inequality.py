@@ -99,47 +99,6 @@ def calculate_concentration_curve(
     return x_interp, y_interp
 
 
-def calculate_quantile_ratio(
-    pop: np.ndarray,
-    wealth: np.ndarray,
-    risk: np.ndarray,
-    quantile: float = 0.2,
-) -> float:
-    """
-    Calculate the ratio of mean risk in the top vs bottom wealth quantile.
-
-    Parameters
-    ----------
-    pop, wealth, risk : np.ndarray
-        As in calculate_CI.
-    quantile : float
-        Share of population defining each tail (default 0.2 = quintile).
-
-    Returns
-    -------
-    float
-        Ratio of top/bottom quantile mean risk, or np.nan if not possible.
-    """
-    df = pd.DataFrame({"pop": pop, "wealth": wealth, "risk": risk})
-    df = df.sort_values("wealth", ascending=True).copy()
-
-    total_pop = df["pop"].sum()
-    if total_pop == 0:
-        return np.nan
-
-    df["cum_pop"] = df["pop"].cumsum()
-    bottom_df = df[df["cum_pop"] <= quantile * total_pop]
-    top_df = df[df["cum_pop"] >= (1 - quantile) * total_pop]
-
-    if bottom_df.empty or top_df.empty:
-        return np.nan
-
-    bottom_avg = np.average(bottom_df["risk"], weights=bottom_df["pop"])
-    top_avg = np.average(top_df["risk"], weights=top_df["pop"])
-
-    return float(top_avg / bottom_avg) if bottom_avg != 0 else np.nan
-
-
 def prepare_arrays(
     pop: np.ndarray,
     wealth: np.ndarray,
