@@ -9,11 +9,8 @@ import numpy as np
 import rasterio
 import rasterio.mask
 from rasterio.warp import reproject, Resampling
-from rasterio.transform import from_bounds
 import geopandas as gpd
 from shapely.geometry import mapping
-import tempfile
-import os
 
 
 def get_country_geometry(boundaries_path: str, iso3: str):
@@ -60,8 +57,18 @@ def clip_raster_to_geometry(raster_path: str, geometry) -> tuple[np.ndarray, dic
     array : np.ndarray, shape (height, width)
     meta : dict  rasterio metadata for the clipped raster
     """
-    geom = [mapping(geometry)]
     with rasterio.open(raster_path) as src:
+        raster_crs = src.crs
+
+        # Reproject geometry to match raster CRS before masking.
+        # The geometry is assumed to be in EPSG:4326 (Natural Earth default).
+        geo_series = gpd.GeoSeries([geometry], crs="EPSG:4326")
+        if not geo_series.crs.equals(raster_crs):
+            geometry_clip = geo_series.to_crs(raster_crs).iloc[0]
+        else:
+            geometry_clip = geometry
+
+        geom = [mapping(geometry_clip)]
         out_image, out_transform = rasterio.mask.mask(src, geom, crop=True, nodata=np.nan)
         out_meta = src.meta.copy()
         out_meta.update({
@@ -154,7 +161,8 @@ def align_rasters(
     risk_array = resample_to_reference(risk_raw, risk_meta, pop_meta,
                                        resampling=Resampling.bilinear)
 
-    # Mask RWI nodata (-999 in Meta RWI dataset)
-    rwi_array[rwi_array == -999] = np.nan
+    # Mask RWI nodata (-999 in Meta RWI dataset); use threshold to catch
+    # interpolation artefacts near nodata boundaries
+    rwi_array[rwi_array < -10] = np.nan
 
     return pop_array, rwi_array, risk_array
