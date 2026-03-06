@@ -34,7 +34,7 @@ def get_country_geometry(boundaries_path: str, iso3: str):
     gdf = gpd.read_file(boundaries_path)
 
     # Try common ISO column names
-    for col in ["ADM0_A3", "ISO_A3", "iso_a3", "GID_0", "ISO3"]:
+    for col in ["ADM0_A3", "ISO_A3", "iso_a3", "GID_0", "ISO3", "shapeGroup"]:
         if col in gdf.columns:
             match = gdf[gdf[col] == iso3]
             if not match.empty:
