@@ -27,9 +27,9 @@ All data lives in `data/` (not tracked in git).
 | WBGT daily GeoTIFFs | [CHIRTS-ERA5](https://data.chc.ucsb.edu/experimental/CHIRTS-ERA5/wbgt/tifs/daily/) | `data/wbgt/` |
 | Population (1 km, 2025) | GHS-POP / WorldPop | `data/population/` |
 | Relative Wealth Index | [Meta / Chi et al.](https://dataforgood.facebook.com/dfg/tools/relative-wealth-index) | `data/rwi/` |
-| Country boundaries | Natural Earth 1:10m | `data/boundaries/` |
+| Country boundaries | GeoBoundaries | `data/boundaries/` |
 
-Country boundaries can be downloaded from [Natural Earth](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/).
+Country boundaries can be downloaded from [geoBoundaries](https://www.geoboundaries.org/).
 
 ## Workflow
 
