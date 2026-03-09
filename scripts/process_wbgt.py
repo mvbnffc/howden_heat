@@ -5,12 +5,21 @@ productivity loss raster.
 Designed to be called as a single array task on a cluster (one job per year).
 Streams WBGT files directly via vsicurl — no raw files written to disk.
 
+Supported datasets (set via --dataset):
+  wbgt            CHIRTS-ERA5 WBGT (original)
+  wbgt_baseline   CHC-CMIP6 observed WBGTmax baseline
+  wbgt_future     CHC-CMIP6 future WBGTmax — requires --future-epoch and --scenario
+
 Usage
 -----
-    python process_wbgt.py --year 2000 --out-dir /path/to/annual/ --config /path/to/config.yaml
+    # Historical
+    python process_wbgt.py --year 2000 --dataset wbgt --config config/config.yaml
 
-    # Or override URL template directly:
-    python process_wbgt.py --year 2000 --out-dir ./annual/
+    # Baseline (wbgt_max)
+    python process_wbgt.py --year 2000 --dataset wbgt_baseline --config config/config.yaml
+
+    # Future
+    python process_wbgt.py --year 2000 --dataset wbgt_future --future-epoch 2030 --scenario ssp245 --config config/config.yaml
 """
 
 import argparse
@@ -82,7 +91,7 @@ def process_year(year: int, url_template: str, out_path: Path) -> bool:
     log.info(f"Year {year}: processing {len(days)} days.")
 
     for d in days:
-        url = "/vsicurl/" + url_template.format(year=d.year, month=d.month, day=d.day)
+        url = "/vsicurl/" + url_template.format(year=d.year, month=d.month, day=d.day)  # epoch/scenario already substituted
         try:
             with rasterio.open(url) as src:
                 if ref_meta is None:
@@ -132,37 +141,86 @@ def process_year(year: int, url_template: str, out_path: Path) -> bool:
 # CLI
 # ---------------------------------------------------------------------------
 
+VALID_DATASETS = ("wbgt", "wbgt_baseline", "wbgt_future")
+VALID_EPOCHS   = ("2030", "2050")
+VALID_SCENARIOS = ("ssp245", "ssp585")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Process one year of WBGT → productivity loss raster.")
-    parser.add_argument("--year",     type=int, required=True, help="Year to process.")
-    parser.add_argument("--out-dir",  type=str, default="data/processed/annual",
-                        help="Output directory for annual rasters.")
-    parser.add_argument("--config",   type=str, default=None,
-                        help="Path to config/config.yaml (to read URL template). "
-                             "If omitted, uses the default CHIRTS-ERA5 URL.")
-    parser.add_argument("--skip-existing", action="store_true", default=True,
-                        help="Skip year if output raster already exists (default: True).")
-    parser.add_argument("--force",    action="store_true",
+    parser.add_argument("--year",         type=int, required=True,
+                        help="Year to process.")
+    parser.add_argument("--dataset",      type=str, default="wbgt",
+                        choices=VALID_DATASETS,
+                        help="Which WBGT dataset to use (default: wbgt).")
+    parser.add_argument("--future-epoch", type=str, default=None,
+                        choices=VALID_EPOCHS,
+                        help="Future epoch [2030|2050] — required when --dataset wbgt_future.")
+    parser.add_argument("--scenario",     type=str, default=None,
+                        choices=VALID_SCENARIOS,
+                        help="SSP scenario [ssp245|ssp585] — required when --dataset wbgt_future.")
+    parser.add_argument("--out-dir",      type=str, default=None,
+                        help="Output directory. Defaults to data/processed/annual/<dataset_label>/")
+    parser.add_argument("--config",       type=str, default=None,
+                        help="Path to config/config.yaml.")
+    parser.add_argument("--force",        action="store_true",
                         help="Overwrite existing output raster.")
     return parser.parse_args()
+
+
+def resolve_url_template(cfg: dict, dataset: str, future_epoch: str | None, scenario: str | None) -> str:
+    """
+    Return the URL template for daily files with {year}, {month}, {day} placeholders.
+    For wbgt_future, {epoch} and {scenario} are pre-substituted here.
+    """
+    if dataset == "wbgt_future":
+        if future_epoch is None or scenario is None:
+            raise ValueError("--future-epoch and --scenario are required for dataset wbgt_future.")
+        raw = cfg["wbgt_future"]["url_template"]
+        return raw.format(epoch=future_epoch, scenario=scenario,
+                          year="{year}", month="{month:02d}", day="{day:02d}")
+    return cfg[dataset]["url_template"]
+
+
+def dataset_label(dataset: str, future_epoch: str | None, scenario: str | None) -> str:
+    """Human-readable label used for output subdirectory and filenames."""
+    if dataset == "wbgt_future":
+        return f"wbgt_future_{future_epoch}_{scenario}"
+    return dataset
 
 
 def main():
     args = parse_args()
 
-    # Resolve URL template
-    url_template = ("https://data.chc.ucsb.edu/experimental/CHIRTS-ERA5/"
-                    "wbgt/tifs/daily/{year}/WBGT.{year}.{month:02d}.{day:02d}.tif")
+    # Load config
+    cfg = {}
     if args.config:
         with open(args.config) as f:
             cfg = yaml.safe_load(f)
-        url_template = cfg["wbgt"]["url_template"]
+    else:
+        # Minimal fallback defaults (no config file needed for wbgt)
+        cfg = {
+            "wbgt": {"url_template": (
+                "https://data.chc.ucsb.edu/experimental/CHIRTS-ERA5/"
+                "wbgt/tifs/daily/{year}/WBGT.{year}.{month:02d}.{day:02d}.tif"
+            )},
+        }
 
-    out_dir  = Path(args.out_dir)
+    label        = dataset_label(args.dataset, args.future_epoch, args.scenario)
+    url_template = resolve_url_template(cfg, args.dataset, args.future_epoch, args.scenario)
+
+    # Output directory: explicit arg, or auto-derived from dataset label
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+    else:
+        out_dir = Path("data/processed/annual") / label
+
     out_path = out_dir / f"productivity_loss_{args.year}.tif"
 
+    log.info(f"Dataset: {label}  |  Year: {args.year}  |  Output: {out_path}")
+
     if out_path.exists() and not args.force:
-        log.info(f"Output already exists, skipping: {out_path}")
+        log.info(f"Output already exists, skipping.")
         sys.exit(0)
 
     success = process_year(args.year, url_template, out_path)
