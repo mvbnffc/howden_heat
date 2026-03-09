@@ -113,8 +113,20 @@ data:
 ##########################
 
 wbgt:
+  # CHIRTS-ERA5 WBGT dataset
   url_template: "https://data.chc.ucsb.edu/experimental/CHIRTS-ERA5/wbgt/tifs/daily/{year}/WBGT.{year}.{month:02d}.{day:02d}.tif"
-  # Adjust start/end year to define the full available period
+  start_year: 1980
+  end_year: 2025
+
+wbgt_baseline:
+  # CHIRTS Future WBGT dataset (WBGT max) - baseline observed period
+  url_template: "https://data.chc.ucsb.edu/products/CHC_CMIP6/observations/wbgtmax/{year}/wbgtmax.{year}.{month:02d}.{day:02d}.tif"
+  start_year: 1983
+  end_year: 2016
+
+wbgt_future:
+  # CHIRTS Future WBGT dataset (WBGT max) - future period
+  url_template: "https://data.chc.ucsb.edu/products/CHC_CMIP6/{epoch}_{scenario}/wbgtmax/{year}/{epoch}_{scenario}.wbgtmax.{year}.{month:02d}.{day:02d}.tif"
   start_year: 1983
   end_year: 2016
 
