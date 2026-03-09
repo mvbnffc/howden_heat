@@ -14,8 +14,8 @@
 #   bash submit_all.sh
 # ---------------------------------------------------------------------------
 
-# === Edit these ============================================================
-PROJECT_DIR="/path/to/howden_heat"   # absolute path on the cluster
+# === PATHS ============================================================
+PROJECT_DIR="/soge-home/projects/Jadapt/howden_heat"   # absolute path on the cluster
 CONDA_ENV="howden_heat"
 SLURM_SCRIPT="${PROJECT_DIR}/cluster/slurm_wbgt.sh"
 # ==========================================================================

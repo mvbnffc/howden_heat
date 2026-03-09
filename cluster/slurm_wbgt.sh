@@ -13,7 +13,6 @@
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/wbgt_%x_%a.out
 #SBATCH --error=logs/wbgt_%x_%a.err
-#SBATCH --partition=standard       # adjust to your cluster's partition name
 
 # ---------------------------------------------------------------------------
 # These are set by submit_all.sh via --export — do not edit here
