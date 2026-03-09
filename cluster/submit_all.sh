@@ -27,22 +27,23 @@ BASE_EXPORT="PROJECT_DIR=${PROJECT_DIR},CONDA_ENV=${CONDA_ENV}"
 # ---------------------------------------------------------------------------
 # 1. CHIRTS-ERA5 WBGT (original)
 # ---------------------------------------------------------------------------
+# Array indices are 0-based; year = START_YEAR + SLURM_ARRAY_TASK_ID
 sbatch \
   --job-name=wbgt \
-  --array=1980-2025 \
-  --export="${BASE_EXPORT},DATASET=wbgt,FUTURE_EPOCH=none,SCENARIO=none,START_YEAR=1980,END_YEAR=2025" \
+  --array=0-45 \
+  --export="${BASE_EXPORT},DATASET=wbgt,FUTURE_EPOCH=none,SCENARIO=none,START_YEAR=1980" \
   "${SLURM_SCRIPT}"
-echo "Submitted: wbgt 1980-2025"
+echo "Submitted: wbgt 1980-2025 (indices 0-45)"
 
 # ---------------------------------------------------------------------------
 # 2. CHC-CMIP6 WBGTmax baseline
 # ---------------------------------------------------------------------------
 sbatch \
   --job-name=wbgt_baseline \
-  --array=1983-2016 \
-  --export="${BASE_EXPORT},DATASET=wbgt_baseline,FUTURE_EPOCH=none,SCENARIO=none,START_YEAR=1983,END_YEAR=2016" \
+  --array=0-33 \
+  --export="${BASE_EXPORT},DATASET=wbgt_baseline,FUTURE_EPOCH=none,SCENARIO=none,START_YEAR=1983" \
   "${SLURM_SCRIPT}"
-echo "Submitted: wbgt_baseline 1983-2016"
+echo "Submitted: wbgt_baseline 1983-2016 (indices 0-33)"
 
 # ---------------------------------------------------------------------------
 # 3-6. CHC-CMIP6 WBGTmax future (2 epochs × 2 scenarios)
@@ -52,10 +53,10 @@ for EPOCH in 2030 2050; do
     JOB_NAME="wbgt_future_${EPOCH}_${SCENARIO}"
     sbatch \
       --job-name="${JOB_NAME}" \
-      --array=1983-2016 \
-      --export="${BASE_EXPORT},DATASET=wbgt_future,FUTURE_EPOCH=${EPOCH},SCENARIO=${SCENARIO},START_YEAR=1983,END_YEAR=2016" \
+      --array=0-33 \
+      --export="${BASE_EXPORT},DATASET=wbgt_future,FUTURE_EPOCH=${EPOCH},SCENARIO=${SCENARIO},START_YEAR=1983" \
       "${SLURM_SCRIPT}"
-    echo "Submitted: ${JOB_NAME} 1983-2016"
+    echo "Submitted: ${JOB_NAME} 1983-2016 (indices 0-33)"
   done
 done
 

@@ -24,7 +24,8 @@ mkdir -p "${PROJECT_DIR}/logs"
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "${CONDA_ENV}"
 
-YEAR=${SLURM_ARRAY_TASK_ID}
+# Compute actual year from 0-indexed task ID
+YEAR=$((START_YEAR + SLURM_ARRAY_TASK_ID))
 
 echo "$(date) — dataset=${DATASET} epoch=${FUTURE_EPOCH} scenario=${SCENARIO} year=${YEAR} host=$(hostname)"
 
