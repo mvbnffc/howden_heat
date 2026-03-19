@@ -25,10 +25,13 @@ Usage
 import argparse
 import logging
 import sys
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
+import requests
 import rasterio
 import yaml
 
@@ -75,50 +78,112 @@ def iter_dates(year: int):
         d += timedelta(days=1)
 
 
-def process_year(year: int, url_template: str, out_path: Path) -> bool:
-    """
-    Stream all daily WBGT for `year`, compute mean annual productivity loss,
-    and write to `out_path`. Returns True on success.
-    """
-    accumulator = None
-    valid_count  = None
-    ref_meta     = None
-    nodata_val   = None
-    n_days       = 0
-    skipped      = 0
+_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/120.0.0.0 Safari/537.36'
+    )
+}
 
-    days = list(iter_dates(year))
-    log.info(f"Year {year}: processing {len(days)} days.")
 
-    for d in days:
-        url = "/vsicurl/" + url_template.format(year=d.year, month=d.month, day=d.day)  # epoch/scenario already substituted
+def download_day(url: str, dest: Path, retries: int = 3, backoff: float = 5.0) -> Path | None:
+    """Download one daily file with retries. Returns dest on success, None on failure."""
+    import time
+    for attempt in range(retries):
         try:
-            with rasterio.open(url) as src:
-                if ref_meta is None:
-                    ref_meta   = src.meta.copy()
-                    ref_meta.update(dtype="float32", nodata=np.nan)
-                    shape      = (src.height, src.width)
-                    nodata_val = src.nodata
-                    accumulator = np.zeros(shape, dtype=np.float64)
-                    valid_count = np.zeros(shape, dtype=np.int32)
-                wbgt = src.read(1).astype(np.float32)
-        except Exception as e:
-            skipped += 1
-            if skipped <= 5:   # only log first few to avoid flooding
-                log.warning(f"  Could not open {url}: {e}")
-            continue
+            r = requests.get(url, timeout=180, headers=_HEADERS)
+            if r.status_code == 200:
+                dest.write_bytes(r.content)
+                return dest
+            elif r.status_code == 404:
+                return None  # file genuinely missing — no point retrying
+        except Exception:
+            pass
+        if attempt < retries - 1:
+            time.sleep(backoff * (attempt + 1))
+    return None
 
-        if nodata_val is not None:
-            wbgt[wbgt == nodata_val] = np.nan
 
-        loss  = wbgt_to_productivity_loss(wbgt)
-        valid = ~np.isnan(loss)
-        accumulator[valid] += loss[valid]
-        valid_count[valid] += 1
-        n_days += 1
+def process_year(year: int, url_template: str, out_path: Path,
+                 n_workers: int = 16) -> bool:
+    """
+    1. Download all daily WBGT files for `year` in parallel.
+    2. Process each file from disk (apply ERF, accumulate).
+    3. Delete each file immediately after reading.
+    Returns True on success.
+    """
+    days = list(iter_dates(year))
+    log.info(f"Year {year}: downloading {len(days)} days with {n_workers} workers.")
 
-        if n_days % 30 == 0:
-            log.info(f"  {year}: {n_days} days processed, {skipped} skipped.")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        tasks = {
+            d: (url_template.format(year=d.year, month=d.month, day=d.day),
+                tmp_dir / f"WBGT.{d.year}.{d.month:02d}.{d.day:02d}.tif")
+            for d in days
+        }
+
+        # --- Parallel download ---
+        downloaded = {}
+        with ThreadPoolExecutor(max_workers=n_workers) as ex:
+            futures = {ex.submit(download_day, url, path): d
+                       for d, (url, path) in tasks.items()}
+            for i, fut in enumerate(as_completed(futures), 1):
+                d = futures[fut]
+                path = fut.result()
+                if path:
+                    downloaded[d] = path
+                if i % 30 == 0:
+                    log.info(f"  {year}: {i}/{len(days)} downloads complete.")
+
+        n_failed = len(days) - len(downloaded)
+        if n_failed:
+            log.warning(f"  {year}: {n_failed} days unavailable (not on server).")
+
+        if not downloaded:
+            log.error(f"Year {year}: no data downloaded.")
+            return False
+
+        # --- Process from disk, delete immediately after reading ---
+        accumulator = None
+        valid_count  = None
+        ref_meta     = None
+        nodata_val   = None
+        n_days       = 0
+        skipped      = 0
+
+        for d in sorted(downloaded):
+            fpath = downloaded[d]
+            try:
+                with rasterio.open(fpath) as src:
+                    if ref_meta is None:
+                        ref_meta   = src.meta.copy()
+                        ref_meta.update(dtype="float32", nodata=np.nan)
+                        shape      = (src.height, src.width)
+                        nodata_val = src.nodata
+                        accumulator = np.zeros(shape, dtype=np.float64)
+                        valid_count = np.zeros(shape, dtype=np.int32)
+                    wbgt = src.read(1).astype(np.float32)
+            except Exception as e:
+                skipped += 1
+                if skipped <= 5:
+                    log.warning(f"  Could not read {fpath.name}: {e}")
+                continue
+            finally:
+                fpath.unlink(missing_ok=True)
+
+            if nodata_val is not None:
+                wbgt[wbgt == nodata_val] = np.nan
+
+            loss  = wbgt_to_productivity_loss(wbgt)
+            valid = ~np.isnan(loss)
+            accumulator[valid] += loss[valid]
+            valid_count[valid] += 1
+            n_days += 1
+
+            if n_days % 30 == 0:
+                log.info(f"  {year}: {n_days} days processed, {skipped} skipped.")
 
     if accumulator is None or valid_count.max() == 0:
         log.error(f"Year {year}: no valid data found.")
@@ -165,6 +230,8 @@ def parse_args():
                         help="Path to config/config.yaml.")
     parser.add_argument("--force",        action="store_true",
                         help="Overwrite existing output raster.")
+    parser.add_argument("--workers",      type=int, default=16,
+                        help="Parallel download workers (default: 16).")
     return parser.parse_args()
 
 
@@ -223,7 +290,7 @@ def main():
         log.info(f"Output already exists, skipping.")
         sys.exit(0)
 
-    success = process_year(args.year, url_template, out_path)
+    success = process_year(args.year, url_template, out_path, n_workers=args.workers)
     sys.exit(0 if success else 1)
 
 
